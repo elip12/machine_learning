@@ -1,4 +1,4 @@
-# supprot vector machine
+# support vector machine
 # author: Eli Pandolfo
 #
 # a machine learning classifier that uses vectors to classify groups of data
