@@ -18,63 +18,68 @@ import numpy as np
 import pandas as pd
 from math import sqrt
 
-# simple python algorithm to compute distance between 2 n-dimensional points
-# p1 and p2 can be lists
-def euclidian_dist1(p1, p2):
-	if len(p1) != len(p2):
-		print('p1 has', len(p1), 'dimensions and p2 has', len(p2), 'dimensions; please input points with the same number of dimensions')
-		return -1
-	dist = 0
-	for i in range(len(p1)):
-		dist += (p1[i] - p2[i])**2
-	return sqrt(dist)
+class K_nearest():
 
-# But, linear algebra and numpy can compute euclidian distance way faster than that algorithm:
-def euclidian_dist(p1, p2):
-	if len(p1) != len(p2):
-		print('p1 has', len(p1), 'dimensions and p2 has', len(p2), 'dimensions; please input points with the same number of dimensions')
-		return -1
-	return np.linalg.norm(np.array(p1) - np.array(p2))
+	def __init__(self):
+		pass
+	# simple python algorithm to compute distance between 2 n-dimensional points
+	# p1 and p2 can be lists
+	def euclidian_dist1(self, p1, p2):
+		if len(p1) != len(p2):
+			print('p1 has', len(p1), 'dimensions and p2 has', len(p2), 'dimensions; please input points with the same number of dimensions')
+			return -1
+		dist = 0
+		for i in range(len(p1)):
+			dist += (p1[i] - p2[i])**2
+		return sqrt(dist)
 
-# computes the mode and confidence of a list
-# example: [a,b,b,c,a,a,] has mode a and confidence 3/6 = .5
-# important to note that confidence is not the same as accuracy;
-# the model's accuracy is unrelated to the confidence of each predicted label
-def mode(l):
-	keys = set(l)
-	mode_dict = dict.fromkeys(keys, 0)
-	for label in l:
-		mode_dict[label] += 1;
-	v = list(mode_dict.values())
-	k = list(mode_dict.keys())
-	conf = max(v) / len(l)
-	return {'label': k[v.index(max(v))], 'confidence': conf}
+	# But, linear algebra and numpy can compute euclidian distance way faster than that algorithm:
+	def euclidian_dist(self, p1, p2):
+		if len(p1) != len(p2):
+			print('p1 has', len(p1), 'dimensions and p2 has', len(p2), 'dimensions; please input points with the same number of dimensions')
+			return -1
+		return np.linalg.norm(np.array(p1) - np.array(p2))
 
-# classify a data point based on a pandas dataframe of features, a pandas
-# series of labels of the same length, a sample datapoint with known features
-# and an unknown label, and a value for k.
-# if no k value is provided, the program will use 1 more than the number of features,
-# to ensure no vote is split
-def k_nearest_neighbors(features, labels, predict_features, k=0):
-	if k <= len(labels.unique()):
-		k = len(labels.unique()) + 1
-		print('setting k to', k)
-	if features.shape[0] != labels.shape[0]:
-		print('features and labels must have corresponding (the same number of) rows')
-		return 'Error'
-	if features.shape[1] != predict_features.shape[1]:
-		print('features and predict_features must have the same number of columns (features must correspond)')
-		return 'Error'
+	# computes the mode and confidence of a list
+	# example: [a,b,b,c,a,a,] has mode a and confidence 3/6 = .5
+	# important to note that confidence is not the same as accuracy;
+	# the model's accuracy is unrelated to the confidence of each predicted label
+	def mode(self, l):
+		keys = set(l)
+		mode_dict = dict.fromkeys(keys, 0)
+		for label in l:
+			mode_dict[label] += 1;
+		v = list(mode_dict.values())
+		k = list(mode_dict.keys())
+		conf = max(v) / len(l)
+		return {'label': k[v.index(max(v))], 'confidence': conf}
 
-	predicted_labels = pd.DataFrame(columns=['label', 'confidence'])
-	for i in range(predict_features.shape[0]):
-		distances = []
-		for j in range(features.shape[0]):
-			distances.append([euclidian_dist(predict_features.loc[i], features.loc[j]), labels.loc[j]])
-		votes = [l[1] for l in sorted(distances)[:k]]
-		result_dict = mode(votes)
-		predicted_labels = predicted_labels.append(result_dict, ignore_index=True)
-	return predicted_labels
+	# classify a data point based on a pandas dataframe of features, a pandas
+	# series of labels of the same length, a sample datapoint with known features
+	# and an unknown label, and a value for k.
+	# if no k value is provided, the program will use 1 more than the number of features,
+	# to ensure no vote is split
+	def k_nearest_neighbors(self, features, labels, predict_features, k=0):
+		if k <= len(labels.unique()):
+			k = len(labels.unique()) + 1
+			print('setting k to', k)
+		if features.shape[0] != labels.shape[0]:
+			print('features and labels must have corresponding (the same number of) rows')
+			return 'Error'
+		if features.shape[1] != predict_features.shape[1]:
+			print('features and predict_features must have the same number of columns (features must correspond)')
+			return 'Error'
+
+		predicted_labels = pd.DataFrame(columns=['label', 'confidence'])
+		for i in range(predict_features.shape[0]):
+			distances = []
+			for j in range(features.shape[0]):
+				distances.append([self.euclidian_dist(predict_features.loc[i], features.loc[j]), labels.loc[j]])
+			votes = [l[1] for l in sorted(distances)[:k]]
+			result_dict = self.mode(votes)
+			predicted_labels = predicted_labels.append(result_dict, ignore_index=True)
+		return predicted_labels
+
 
 # def main():
 # 	features = {'a': pd.Series([1,2,7,3,8]), 'b': pd.Series([2,3,7,3,9]), 'c': pd.Series([1,1,9,1,7]), 'd': pd.Series([1,2,6,1,9])}
