@@ -35,8 +35,8 @@ class Support_Vector_Machine:
 
 		for step in steps:
 			w = np.array([curr_w, curr_w])
-			min_found = False
-			while not min_found:
+			step_done = False
+			while not step_done:
 				for b in np.arange(-1 * max_feat * b_step_multiplier,
 									max_feat * b_step_multiplier,
 									max_feat * step):
@@ -51,7 +51,8 @@ class Support_Vector_Machine:
 						if found:
 							optimized[np.linalg.norm(tr_w)] = [tr_w, b]
 				if w[0] < 0:
-					min_found = True
+					step_done = True
+					print('Step optimized')
 				else:
 					w = w - step
 			mags = sorted([n for n in optimized])
@@ -85,6 +86,7 @@ def main():
 
 	svm = Support_Vector_Machine()
 	svm.train(features, labels)
+	print('data trained')
 
 	predict_labels = svm.predict(predict_features)
 	print(predict_labels)
