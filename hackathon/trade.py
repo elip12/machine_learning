@@ -2,8 +2,13 @@ import numpy as np
 import pandas as pd
 from sklearn import svm
 from sklearn import preprocessing
+from sklearn import datasets, linear_model
 import datetime as dt
-import lin_reg
+import matplotlib
+matplotlib.use('TkAgg')
+from matplotlib import style
+style.use('./elip12.mplstyle')
+import matplotlib.pyplot as plt
 
 '''
 metrics:
@@ -27,26 +32,26 @@ buy volume: total coin traded @ ask price (buyer
 # v_usd = df['usd_volume'].tolist()
 # v_buy = df['buy_volume'].tolist()
 
-def add_lin_reg_prediction_to_df(df, duration=5):
-    # convert timestamps to ints
-    # run reg_model on last 5 ints and next int
-    vwap_series = []
-    xdata = [n for n in range(duration)]
-    ydata = []
-    for index, row in df.iterrows():
-        if len(ydata) < duration:
-            ydata.append(row['vwap'])
-        else:
-            m, b = lin_reg.best_fit(np.array(xdata), np.array(ydata))
+# def add_lin_reg_prediction_to_df(df, duration=5):
+#     # convert timestamps to ints
+#     # run reg_model on last 5 ints and next int
+#     vwap_series = []
+#     xdata = [n for n in range(duration)]
+#     ydata = []
+#     for index, row in df.iterrows():
+#         if len(ydata) < duration:
+#             ydata.append(row['vwap'])
+#         else:
+#             m, b = lin_reg.best_fit(np.array(xdata), np.array(ydata))
             
-            vwap_series.append(1 if m > 0 else 0)
-            ydata.append(row['vwap'])
-            ydata.pop(0)
+#             vwap_series.append(1 if m > 0 else 0)
+#             ydata.append(row['vwap'])
+#             ydata.pop(0)
     
-    df = df[duration:]
-    df = df.assign(linreg = pd.Series(vwap_series, index=df.index))
+#     df = df[duration:]
+#     df = df.assign(linreg = pd.Series(vwap_series, index=df.index))
     
-    return df
+#     return df
 
 
 # get current metrics for xrp
@@ -59,7 +64,6 @@ def get_data(delta):
     now = dt.datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
 
     # this is the address that the aggregated price on xrpcharts.ripple.com uses
-    # -- whose address is it? who fuckin knows
     address = 'https://data.ripple.com/v2/exchanges/XRP/USD+rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B?limit=1000&format=csv&interval=1day&start=' + str(start) + '&end=' + str(now)
     df = pd.read_csv(address)
     df.drop(['base_issuer', 'counter_issuer', 'open_time', 'close_time', 'base_currency', 'counter_currency'], axis=1, inplace=True)
@@ -68,20 +72,46 @@ def get_data(delta):
     df.dropna(inplace=True)
     return df
 
-# use scikit-learn's SVM to predict whether tomorrow's vwap will be higher than today's vwap
-# extension: use derivatives not values to improve accuracy and recognize trends longer than 1 day
-def classify(df, return_clf=True):
+# use a support vector machine to identify peaks and valleys
+# takes in a dataframe whose rows are days and cols are metrics:
+# open, high, low, close, vwap, count, xrp volume, usd volume, buy volume
+def identify_pv(df, alpha, delta, return_clf=True):
 
-    X = df.values.tolist()
+    X = df.values
+
+    # scikit-learn's preprocessing feature to make data easier
+    # for the classifier to group
     X = preprocessing.scale(X)
-    p_close = df['close'].tolist()
+
+    # convert vwap to numpy array. Indices are days and elements are values
+    vwap = df['vwap'].values
     y = []
-    for index, close_price in enumerate(p_close):
-        if index > 0 and close_price > p_close[index - 1]:
-            y.append(1)
-        elif index > 0 and close_price <= p_close[index - 1]:
-            y.append(0)
-    X = X[1:]
+    
+    for index, price in enumerate(vwap):
+        if index > delta - 1 and index < len(vwap) - (delta - 1):
+            lin_reg = linear_model.LinearRegression()
+            lin_X = np.arange(delta).reshape(-1, 1)
+            
+            lin_y = vwap[index - (delta - 1): index + 1]
+            lin_reg.fit(lin_X, lin_y)
+            past_coef = lin_reg.coef_
+
+            lin_y = vwap[index: index + (delta)]
+            lin_reg.fit(lin_X, lin_y)
+            future_coef = lin_reg.coef_
+
+            print(past_coef, future_coef)
+            
+            # if the last 6 days have a positive trendline with a slope > a
+            # and the next 6 days have a negative trendline with a slope < -a
+            if past_coef < -alpha and future_coef > alpha:
+                y.append(-1)
+            elif past_coef > alpha and future_coef < -alpha:
+                y.append(1)
+            else:
+                y.append(0)
+
+    X = X[5:-5]
 
     if return_clf:
         clf = svm.SVC(probability=True)
@@ -95,25 +125,65 @@ def predict(clf, X):
     return predicted
 
 
-df = get_data(60)
+df = get_data(50)
+x, y = identify_pv(df, 0.05, 4, return_clf=False)
 
-test_df = df[45:]
-classify_df = df[:45]
-clf = classify(classify_df)
-X, y = classify(test_df, return_clf=False)
+print(y)
 
-without_lin = predict(clf, X).tolist()
-cont = y
+plt.plot(df['vwap'][4:-3])
+plt.show()
 
-acc = 0
-bcc = 0
-for i in range(len(cont)):
-    if without_lin[i] == cont[i]:
-        acc += 1
-    else:
-        bcc += 1
 
-print("acc: ", acc, "bcc: ", bcc, "t: ", acc / (acc + bcc))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# df = get_data(60)
+
+# test_df = df[45:]
+# classify_df = df[:45]
+# clf = classify(classify_df)
+# X, y = classify(test_df, return_clf=False)
+
+# without_lin = predict(clf, X).tolist()
+# cont = y
+
+# acc = 0
+# bcc = 0
+# for i in range(len(cont)):
+#     if without_lin[i] == cont[i]:
+#         acc += 1
+#     else:
+#         bcc += 1
+
+# print("acc: ", acc, "bcc: ", bcc, "t: ", acc / (acc + bcc))
 
 # df = add_lin_reg_prediction_to_df(df, 3)
 
