@@ -32,28 +32,6 @@ buy volume: total coin traded @ ask price (buyer
 # v_usd = df['usd_volume'].tolist()
 # v_buy = df['buy_volume'].tolist()
 
-# def add_lin_reg_prediction_to_df(df, duration=5):
-#     # convert timestamps to ints
-#     # run reg_model on last 5 ints and next int
-#     vwap_series = []
-#     xdata = [n for n in range(duration)]
-#     ydata = []
-#     for index, row in df.iterrows():
-#         if len(ydata) < duration:
-#             ydata.append(row['vwap'])
-#         else:
-#             m, b = lin_reg.best_fit(np.array(xdata), np.array(ydata))
-            
-#             vwap_series.append(1 if m > 0 else 0)
-#             ydata.append(row['vwap'])
-#             ydata.pop(0)
-    
-#     df = df[duration:]
-#     df = df.assign(linreg = pd.Series(vwap_series, index=df.index))
-    
-#     return df
-
-
 # get current metrics for xrp
 # delta is the number of days before the present you want to get data from
 # for now we are padding nan data, but should find a better thing to do later
@@ -75,7 +53,7 @@ def get_data(delta):
 # use a support vector machine to identify peaks and valleys
 # takes in a dataframe whose rows are days and cols are metrics:
 # open, high, low, close, vwap, count, xrp volume, usd volume, buy volume
-def identify_pv(df, alpha, delta, return_clf=True):
+def identify_pv(df, alpha=0.055, delta=7, return_clf=True):
 
     X = df.values
 
@@ -100,18 +78,26 @@ def identify_pv(df, alpha, delta, return_clf=True):
             lin_reg.fit(lin_X, lin_y)
             future_coef = lin_reg.coef_
 
-            print(past_coef, future_coef)
+            #print(past_coef, future_coef)
             
             # if the last 6 days have a positive trendline with a slope > a
             # and the next 6 days have a negative trendline with a slope < -a
-            if past_coef < -alpha and future_coef > alpha:
+            if past_coef < 0 and future_coef > 0 and (past_coef < -alpha or future_coef > alpha):
                 y.append(-1)
-            elif past_coef > alpha and future_coef < -alpha:
+            elif past_coef > 0 and future_coef < 0 and (past_coef > alpha or future_coef < -alpha):
                 y.append(1)
             else:
                 y.append(0)
 
-    X = X[5:-5]
+    # trim x data be the same length as y data
+    X = X[delta:-(delta - 1)]
+
+    # postprocess classified data. If only 1 datapoint is recognized, the spike is too localized to
+    # be indicative of a trend and should be discarded
+    for index, val in enumerate(y):
+        if index > 0 and index < len(y) - 1:
+            if val != 0 and not (val == y[index - 1] or val == y[index + 1]):
+                y[index] = 0
 
     if return_clf:
         clf = svm.SVC(probability=True)
@@ -124,93 +110,24 @@ def predict(clf, X):
     predicted = clf.predict(X)
     return predicted
 
+def plot(X, y, delta=7):
+    plt.scatter(np.arange(len(y)), [abs(yut) for yut in y], color="green")
 
-df = get_data(50)
-x, y = identify_pv(df, 0.05, 4, return_clf=False)
-
-print(y)
-
-plt.plot(df['vwap'][4:-3])
-plt.show()
-
+    plt.plot(df['vwap'][delta:-(delta - 1)], color="orange")
+    plt.xticks(rotation='vertical')
+    plt.subplots_adjust(bottom=0.05)
+    plt.show()
 
 
 
+df = get_data(150)
 
+'''
+TODO now: past features to x features (all daily features for past n days, and use all those to predict whether today will be pv)
+'''
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# df = get_data(60)
-
-# test_df = df[45:]
-# classify_df = df[:45]
-# clf = classify(classify_df)
-# X, y = classify(test_df, return_clf=False)
-
-# without_lin = predict(clf, X).tolist()
-# cont = y
-
-# acc = 0
-# bcc = 0
-# for i in range(len(cont)):
-#     if without_lin[i] == cont[i]:
-#         acc += 1
-#     else:
-#         bcc += 1
-
-# print("acc: ", acc, "bcc: ", bcc, "t: ", acc / (acc + bcc))
-
-# df = add_lin_reg_prediction_to_df(df, 3)
-
-# test_df = df[45:]
-# classify_df = df[:45]
-# clf = classify(classify_df)
-# X, y = classify(test_df, return_clf=False)
-
-# with_lin = predict(clf, X).tolist()
-# lin_cont = y
-
-# acc = 0
-# bcc = 0
-# for i in range(len(lin_cont)):
-#     if with_lin[i] == lin_cont[i]:
-#         acc += 1
-#     else:
-#         bcc += 1
-
-# print("\nlacc: ", acc, "lbcc: ", bcc, "t: ", acc / (acc + bcc))
-
-
-
-
-
-
-
+#X, y = identify_pv(df, return_clf=False)
+#plot(X, y)
 
 
 
