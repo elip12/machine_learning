@@ -50,23 +50,34 @@ def get_data(delta):
     df.dropna(inplace=True)
     return df
 
-# use a support vector machine to identify peaks and valleys
+# format dataframe
+# each row of the dataframe now has 2 weeks worth of metrics 
+def format_df(df, delta=14):
+
+    X = df.values.tolist()
+    
+    for index in range(len(X) - 1, -1, -1):
+        if index >= delta:
+            for prev_day in range(1, delta):
+                X[index].extend(X[index - prev_day])
+            X[index] = np.asarray(X[index])
+
+    # trim the head of X by delta elements
+    X = np.asarray(X[delta:])
+    
+    return X
+
+# use linear regression to identify peaks and valleys
 # takes in a dataframe whose rows are days and cols are metrics:
 # open, high, low, close, vwap, count, xrp volume, usd volume, buy volume
-def identify_pv(df, alpha=0.055, delta=7, return_clf=True):
-
-    X = df.values
-
-    # scikit-learn's preprocessing feature to make data easier
-    # for the classifier to group
-    X = preprocessing.scale(X)
+def identify_pv(df, alpha=0.055, delta=7):
 
     # convert vwap to numpy array. Indices are days and elements are values
     vwap = df['vwap'].values
     y = []
     
     for index, price in enumerate(vwap):
-        if index > delta - 1 and index < len(vwap) - (delta - 1):
+        if index >= delta and index <= len(vwap) - delta:
             lin_reg = linear_model.LinearRegression()
             lin_X = np.arange(delta).reshape(-1, 1)
             
@@ -80,8 +91,8 @@ def identify_pv(df, alpha=0.055, delta=7, return_clf=True):
 
             #print(past_coef, future_coef)
             
-            # if the last 6 days have a positive trendline with a slope > a
-            # and the next 6 days have a negative trendline with a slope < -a
+            # if the last delta days have a positive trendline with a slope > alpha
+            # or the next delta days have a negative trendline with a slope < -alpha
             if past_coef < 0 and future_coef > 0 and (past_coef < -alpha or future_coef > alpha):
                 y.append(-1)
             elif past_coef > 0 and future_coef < 0 and (past_coef > alpha or future_coef < -alpha):
@@ -89,8 +100,6 @@ def identify_pv(df, alpha=0.055, delta=7, return_clf=True):
             else:
                 y.append(0)
 
-    # trim x data be the same length as y data
-    X = X[delta:-(delta - 1)]
 
     # postprocess classified data. If only 1 datapoint is recognized, the spike is too localized to
     # be indicative of a trend and should be discarded
@@ -99,12 +108,13 @@ def identify_pv(df, alpha=0.055, delta=7, return_clf=True):
             if val != 0 and not (val == y[index - 1] or val == y[index + 1]):
                 y[index] = 0
 
-    if return_clf:
-        clf = svm.SVC(probability=True)
-        clf.fit(X, y)
-        return clf
-    else:
-        return X, y
+    return y, delta
+    
+
+def classify(X, y):
+    clf = svm.SVC(probability=True)
+    clf.fit(X, y)
+    return clf
 
 def predict(clf, X):
     predicted = clf.predict(X)
@@ -118,15 +128,26 @@ def plot(X, y, delta=7):
     plt.subplots_adjust(bottom=0.05)
     plt.show()
 
-
+X_delta = 14
+y_delta = 7
 
 df = get_data(150)
+X = format_df(df, delta=X_delta)
+y, delta = identify_pv(df, delta=y_delta)
 
-'''
-TODO now: past features to x features (all daily features for past n days, and use all those to predict whether today will be pv)
-'''
+X = X[:-y_delta + 1]
+y = y[X_delta - y_delta:]
+y = np.asarray(y)
 
-#X, y = identify_pv(df, return_clf=False)
+print(y)
+print()
+clf = classify(X[:75], y[:75])
+pred = predict(clf, X[75:])
+
+print(y[:75])
+print()
+print(pred)
+# print(df)
 #plot(X, y)
 
 
