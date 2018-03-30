@@ -9,6 +9,7 @@ matplotlib.use('TkAgg')
 from matplotlib import style
 style.use('./elip12.mplstyle')
 import matplotlib.pyplot as plt
+import quandl
 
 '''
 metrics:
@@ -22,6 +23,27 @@ volume: total coin traded per day
 buy volume: total coin traded @ ask price (buyer 
     as opposed to bid/seller price)
 '''
+def get_btc(delta):
+# so that I don't show my Quandl API key
+    with open('/Users/Eli/Desktop/coding/quandl_api.txt', 'r') as api:
+        key = api.read()
+    quandl.ApiConfig.api_key = key
+
+    now = dt.datetime.now()
+    start = (now - dt.timedelta(days=delta)).strftime('%Y-%m-%d')
+
+    # pull bitcoin price data from bitstamp through quandl
+    #https://www.quandl.com/data/BCHARTS/BITSTAMPUSD-Bitcoin-Markets-bitstampUSD
+    btc = quandl.get('BCHARTS/BITSTAMPUSD')
+    btc = btc[:][start:]
+    btc = np.round(btc, 2)
+    btc.index = pd.to_datetime(btc.index)
+    btc.index.rename('Date', inplace=True)
+
+    btc = btc.rename(columns={"Weighted Price": 'vwap'})
+
+    return btc
+
 # p_open = df['open'].tolist()
 # p_high = df['high'].tolist()
 # p_low = df['low'].tolist()
@@ -112,7 +134,8 @@ def identify_pv(df, alpha=0.055, delta=7):
     
 
 def classify(X, y):
-    clf = svm.SVC(probability=True)
+
+    clf = svm.SVC()
     clf.fit(X, y)
     return clf
 
@@ -120,8 +143,9 @@ def predict(clf, X):
     predicted = clf.predict(X)
     return predicted
 
-def plot(X, y, delta=7):
-    plt.scatter(np.arange(len(y)), [abs(yut) for yut in y], color="green")
+def plot(X, y, df, delta=7):
+    plt.scatter(df.index[delta:-(delta - 1)], [abs(yut) * 10000 if yut >= 0 else 0 for yut in y], color="green")
+    plt.scatter(df.index[delta:-(delta - 1)], [abs(yut) * 10000 if yut < 0 else 0 for yut in y], color="blue")
 
     plt.plot(df['vwap'][delta:-(delta - 1)], color="orange")
     plt.xticks(rotation='vertical')
@@ -130,25 +154,32 @@ def plot(X, y, delta=7):
 
 X_delta = 14
 y_delta = 7
+n = 500
 
-df = get_data(150)
+df = get_btc(600)
+#print(df)
+
+# df = get_data(20)
+# print(df)
 X = format_df(df, delta=X_delta)
 y, delta = identify_pv(df, delta=y_delta)
 
+
 X = X[:-y_delta + 1]
-y = y[X_delta - y_delta:]
+y = y[abs(X_delta - y_delta):]
 y = np.asarray(y)
 
-print(y)
-print()
-clf = classify(X[:75], y[:75])
-pred = predict(clf, X[75:])
+#print(y)
+#print()
+clf = classify(X[:n], y[:n])
+pred = predict(clf, X[n:])
 
-print(y[:75])
+print(y[n:])
 print()
 print(pred)
+
 # print(df)
-#plot(X, y)
+#plot(X, y, df)
 
 
 
