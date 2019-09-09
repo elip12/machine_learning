@@ -149,4 +149,4 @@ def main():
 	solver.print_board(predicted, 'masyu_test.txt')
 
 main()
-#add shit to do classical analysis first, then use k nearest
+#add code to do classical analysis first, then use k nearest
